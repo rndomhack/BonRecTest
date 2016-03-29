@@ -3,12 +3,17 @@
 
 CBonRecTest::CBonRecTest() :
 	bonDriverPath(NULL),
+	decoderPath(NULL),
 	outputPath(NULL),
 	space(0UL),
 	channel(0L),
+	emm(false),
 	hBonDriver(NULL),
+	hDecoder(NULL),
 	pBonDriver(NULL),
 	pBonDriver2(NULL),
+	pDecoder(NULL),
+	pDecoder2(NULL),
 	hRecThread(NULL),
 	hOutput(INVALID_HANDLE_VALUE),
 	isThreadWorking(false)
@@ -24,6 +29,7 @@ bool CBonRecTest::Start()
 {
 	try {
 		LoadBonDriver();
+		LoadDecoder();
 		OpenOutput();
 		OpenTuner();
 		StartThread();
@@ -43,6 +49,7 @@ bool CBonRecTest::Stop()
 		StopThread();
 		CloseTuner();
 		CloseOutput();
+		UnloadDecoder();
 		UnloadBonDriver();
 	}
 	catch (LPCTSTR err) {
@@ -71,6 +78,37 @@ void CBonRecTest::LoadBonDriver()
 	if (!hBonDriver) {
 		throw TEXT("Could not load BonDriver");
 	}
+
+	IBonDriver* (*CreateBonDriver)();
+	CreateBonDriver = (IBonDriver* (*)())GetProcAddress(hBonDriver, "CreateBonDriver");
+
+	if (!CreateBonDriver) {
+		FreeLibrary(hBonDriver);
+		hBonDriver = NULL;
+
+		throw TEXT("Could not get address CreateBonDriver()");
+	}
+
+	pBonDriver = CreateBonDriver();
+
+	if (!pBonDriver) {
+		FreeLibrary(hBonDriver);
+		hBonDriver = NULL;
+
+		throw TEXT("Could not get IBonDriver");
+	}
+
+	pBonDriver2 = dynamic_cast<IBonDriver2 *>(pBonDriver);
+
+	if (!pBonDriver2) {
+		pBonDriver->Release();
+		pBonDriver = NULL;
+
+		FreeLibrary(hBonDriver);
+		hBonDriver = NULL;
+
+		throw TEXT("Could not open tuner");
+	}
 }
 
 void CBonRecTest::UnloadBonDriver()
@@ -79,60 +117,85 @@ void CBonRecTest::UnloadBonDriver()
 
 	std::cerr << "Unload BonDriver..." << std::endl;
 
+	pBonDriver->Release();
+	pBonDriver = NULL;
+	pBonDriver2 = NULL;
+
 	FreeLibrary(hBonDriver);
 	hBonDriver = NULL;
 }
 
-void CBonRecTest::OpenTuner()
+void CBonRecTest::LoadDecoder()
 {
-	std::cerr << "Open Tuner..." << std::endl;
+	if (!decoderPath) return;
 
-	if (pBonDriver) {
-		throw TEXT("BonDriver is already opened");
+	std::cerr << "Load Decoder..." << std::endl;
+
+	if (hDecoder) {
+		throw TEXT("Decoder is already loaded");
 	}
 
-	if (!hBonDriver) {
-		throw TEXT("BonDriver is not loaded");
+	hDecoder = LoadLibrary(decoderPath);
+
+	if (!hDecoder) {
+		throw TEXT("Could not load Decoder");
 	}
 
-	IBonDriver* (*CreateBonDriver)();
-	CreateBonDriver = (IBonDriver* (*)())GetProcAddress(hBonDriver, "CreateBonDriver");
+	IB25Decoder* (*CreateB25Decoder)();
+	CreateB25Decoder = (IB25Decoder* (*)())GetProcAddress(hDecoder, "CreateB25Decoder");
 
-	if (!CreateBonDriver) {
-		throw TEXT("Could not get address CreateBonDriver()");
+	if (!CreateB25Decoder) {
+		FreeLibrary(hDecoder);
+		hDecoder = NULL;
+
+		throw TEXT("Could not get address CreateB25Decoder()");
 	}
 
-	pBonDriver = CreateBonDriver();
+	pDecoder = CreateB25Decoder();
 
-	if (!pBonDriver) {
-		throw TEXT("Could not get IBonDriver");
+	if (!pDecoder) {
+		FreeLibrary(hDecoder);
+		hDecoder = NULL;
+
+		throw TEXT("Could not get IB25Decoder");
 	}
 
-	pBonDriver2 = dynamic_cast<IBonDriver2 *>(pBonDriver);
+	if (!pDecoder->Initialize()) {
+		FreeLibrary(hDecoder);
+		hDecoder = NULL;
 
-	if (!pBonDriver->OpenTuner() || !pBonDriver2->SetChannel(space, channel)) {
-		pBonDriver->Release();
-
-		pBonDriver = NULL;
-		pBonDriver2 = NULL;
-
-		throw TEXT("Could not open tuner");
+		throw TEXT("Could not initialize IB25Decoder");
 	}
 
-	
+	pDecoder2 = dynamic_cast<IB25Decoder2 *>(pDecoder);
+
+	if (!pDecoder2) {
+		pDecoder->Release();
+		pDecoder = NULL;
+
+		FreeLibrary(hDecoder);
+		hDecoder = NULL;
+
+		throw TEXT("Could not get IB25Decoder2");
+	}
+
+	pDecoder2->DiscardNullPacket(true);
+	pDecoder2->DiscardScramblePacket(false);
+	pDecoder2->EnableEmmProcess(emm);
 }
 
-void CBonRecTest::CloseTuner()
+void CBonRecTest::UnloadDecoder()
 {
-	if (!pBonDriver) return;
+	if (!hDecoder) return;
 
-	std::cerr << "Close Tuner..." << std::endl;
+	std::cerr << "Unload Decoder..." << std::endl;
 
-	pBonDriver->CloseTuner();
-	pBonDriver->Release();
+	pDecoder->Release();
+	pDecoder = NULL;
+	pDecoder2 = NULL;
 
-	pBonDriver = NULL;
-	pBonDriver2 = NULL;
+	FreeLibrary(hDecoder);
+	hDecoder = NULL;
 }
 
 void CBonRecTest::OpenOutput()
@@ -172,6 +235,30 @@ void CBonRecTest::CloseOutput()
 	hOutput = INVALID_HANDLE_VALUE;
 }
 
+void CBonRecTest::OpenTuner()
+{
+	std::cerr << "Open Tuner..." << std::endl;
+
+	if (!pBonDriver->OpenTuner()) {
+		throw TEXT("Could not open tuner");
+	}
+
+	if (!pBonDriver2->SetChannel(space, channel)) {
+		pBonDriver->CloseTuner();
+
+		throw TEXT("Could not set channel");
+	}
+}
+
+void CBonRecTest::CloseTuner()
+{
+	if (!hBonDriver) return;
+
+	std::cerr << "Close Tuner..." << std::endl;
+
+	pBonDriver->CloseTuner();
+}
+
 void CBonRecTest::StartThread()
 {
 	std::cerr << "Start Thread..." << std::endl;
@@ -205,7 +292,6 @@ void CBonRecTest::StopThread()
 	hRecThread = NULL;
 }
 
-
 unsigned int __stdcall CBonRecTest::RecThread(void *pParam)
 {
 	CBonRecTest *pThis = static_cast<CBonRecTest *>(pParam);
@@ -220,13 +306,20 @@ void CBonRecTest::RecMain()
 	BYTE *pStreamData = NULL;
 	DWORD streamSize = 0UL;
 	DWORD streamRemain = 0UL;
+	BYTE *pDecodeData = NULL;
+	DWORD decodeSize = 0UL;
 	DWORD bytesWritten = 0UL;
 	DWORD bytesRead = 0UL;
 
 	while (isThreadWorking) {
 		if (pBonDriver->GetTsStream(&pStreamData, &streamSize, &streamRemain)) {
 			if (pStreamData && streamSize) {
-				WriteFile(hOutput, pStreamData, streamSize, &bytesWritten, NULL);
+				if (hDecoder && pDecoder->Decode(pStreamData, streamSize, &pDecodeData, &decodeSize)) {
+					WriteFile(hOutput, pDecodeData, decodeSize, &bytesWritten, NULL);
+				}
+				else {
+					WriteFile(hOutput, pStreamData, streamSize, &bytesWritten, NULL);
+				}
 			}
 		}
 

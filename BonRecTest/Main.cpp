@@ -42,6 +42,10 @@ int _tmain(int argc, TCHAR* argv[])
 			pBonRecTest.bonDriverPath = argv[i + 1];
 			used = true;
 		}
+		else if (!_tcscmp(argv[i], TEXT("--decoder"))) {
+			pBonRecTest.decoderPath = argv[i + 1];
+			used = true;
+		}
 		else if (!_tcscmp(argv[i], TEXT("--output"))) {
 			pBonRecTest.outputPath = argv[i + 1];
 			used = true;
@@ -61,6 +65,9 @@ int _tmain(int argc, TCHAR* argv[])
 				pBonRecTest.channel = channel % 10000UL;
 			}
 			used = true;
+		}
+		else if (!_tcscmp(argv[i], TEXT("--emm"))) {
+			pBonRecTest.emm = true;
 		}
 	}
 

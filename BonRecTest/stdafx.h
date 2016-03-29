@@ -17,5 +17,6 @@
 
 #include "include/IBonDriver.h"
 #include "include/IBonDriver2.h"
+#include "include/IB25Decoder.h"
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください
