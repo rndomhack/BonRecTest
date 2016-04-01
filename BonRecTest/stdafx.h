@@ -13,7 +13,6 @@
 #include <string>
 #include <windows.h>
 #include <process.h>
-#include <signal.h>
 
 #include "include/IBonDriver.h"
 #include "include/IBonDriver2.h"

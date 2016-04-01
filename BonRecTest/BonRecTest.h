@@ -14,6 +14,7 @@ public:
 	DWORD space;
 	DWORD channel;
 	bool emm;
+	bool log;
 
 private:
 	void LoadBonDriver();

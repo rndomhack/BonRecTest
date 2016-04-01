@@ -4,12 +4,11 @@
 #include "stdafx.h"
 #include "BonRecTest.h"
 
-
-bool finish = false;
-
-void hSignal(int signal)
+unsigned int __stdcall WaitThread(void *pParam)
 {
-	finish = true;
+	getchar();
+
+	return 0;
 }
 
 void usage()
@@ -28,6 +27,7 @@ int _tmain(int argc, TCHAR* argv[])
 	}
 
 	CBonRecTest pBonRecTest;
+	HANDLE hWaitThread;
 
 	TCHAR *pEnd;
 	bool used = false;
@@ -69,24 +69,23 @@ int _tmain(int argc, TCHAR* argv[])
 		else if (!_tcscmp(argv[i], TEXT("--emm"))) {
 			pBonRecTest.emm = true;
 		}
+		else if (!_tcscmp(argv[i], TEXT("--log"))) {
+			pBonRecTest.log = true;
+		}
 	}
 
 	if (!pBonRecTest.Start()) {
 		return -1;
 	}
 
-	if (signal(SIGTERM, hSignal) == SIG_ERR || signal(SIGINT, hSignal) == SIG_ERR) {
-		std::cerr << "Error: Could not regist signal handler" << std::endl;
+	hWaitThread = (HANDLE)_beginthreadex(NULL, 0, WaitThread, NULL, 0, NULL);
 
-		return -1;
-	}
+	while (WaitForSingleObject(hWaitThread, 10UL) != WAIT_OBJECT_0);
 
-	while (!finish)
-	{
-		Sleep(10UL);
-	}
+	CloseHandle(hWaitThread);
+	hWaitThread = NULL;
 
-	std::cerr << "Recieve signal!" << std::endl;
+	std::cerr << "Abort!" << std::endl;
 
     return 0;
 }

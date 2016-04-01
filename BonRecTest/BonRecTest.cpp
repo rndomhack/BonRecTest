@@ -8,6 +8,7 @@ CBonRecTest::CBonRecTest() :
 	space(0UL),
 	channel(0L),
 	emm(false),
+	log(false),
 	hBonDriver(NULL),
 	hDecoder(NULL),
 	pBonDriver(NULL),
@@ -63,7 +64,7 @@ bool CBonRecTest::Stop()
 
 void CBonRecTest::LoadBonDriver()
 {
-	std::cerr << "Load BonDriver..." << std::endl;
+	if (log) std::cerr << "Load BonDriver..." << std::endl;
 
 	if (hBonDriver) {
 		throw TEXT("BonDriver is already loaded");
@@ -115,7 +116,7 @@ void CBonRecTest::UnloadBonDriver()
 {
 	if (!hBonDriver) return;
 
-	std::cerr << "Unload BonDriver..." << std::endl;
+	if (log) std::cerr << "Unload BonDriver..." << std::endl;
 
 	pBonDriver->Release();
 	pBonDriver = NULL;
@@ -129,7 +130,7 @@ void CBonRecTest::LoadDecoder()
 {
 	if (!decoderPath) return;
 
-	std::cerr << "Load Decoder..." << std::endl;
+	if (log) std::cerr << "Load Decoder..." << std::endl;
 
 	if (hDecoder) {
 		throw TEXT("Decoder is already loaded");
@@ -188,7 +189,7 @@ void CBonRecTest::UnloadDecoder()
 {
 	if (!hDecoder) return;
 
-	std::cerr << "Unload Decoder..." << std::endl;
+	if (log) std::cerr << "Unload Decoder..." << std::endl;
 
 	pDecoder->Release();
 	pDecoder = NULL;
@@ -200,7 +201,7 @@ void CBonRecTest::UnloadDecoder()
 
 void CBonRecTest::OpenOutput()
 {
-	std::cerr << "Open Output..." << std::endl;
+	if (log) std::cerr << "Open Output..." << std::endl;
 
 	if (hOutput != INVALID_HANDLE_VALUE) {
 		throw TEXT("Output already exists");
@@ -226,7 +227,7 @@ void CBonRecTest::CloseOutput()
 {
 	if (hOutput == INVALID_HANDLE_VALUE) return;
 
-	std::cerr << "Close Output..." << std::endl;
+	if (log) std::cerr << "Close Output..." << std::endl;
 
 	if (!CloseHandle(hOutput)) {
 		throw TEXT("Could not close output");
@@ -237,7 +238,7 @@ void CBonRecTest::CloseOutput()
 
 void CBonRecTest::OpenTuner()
 {
-	std::cerr << "Open Tuner..." << std::endl;
+	if (log) std::cerr << "Open Tuner..." << std::endl;
 
 	if (!pBonDriver->OpenTuner()) {
 		throw TEXT("Could not open tuner");
@@ -254,14 +255,14 @@ void CBonRecTest::CloseTuner()
 {
 	if (!hBonDriver) return;
 
-	std::cerr << "Close Tuner..." << std::endl;
+	if (log) std::cerr << "Close Tuner..." << std::endl;
 
 	pBonDriver->CloseTuner();
 }
 
 void CBonRecTest::StartThread()
 {
-	std::cerr << "Start Thread..." << std::endl;
+	if (log) std::cerr << "Start Thread..." << std::endl;
 
 	isThreadWorking = true;
 
@@ -278,7 +279,7 @@ void CBonRecTest::StopThread()
 {
 	if (!hRecThread) return;
 
-	std::cerr << "Stop Thread..." << std::endl;
+	if (log) std::cerr << "Stop Thread..." << std::endl;
 
 	isThreadWorking = false;
 
@@ -326,7 +327,7 @@ void CBonRecTest::RecMain()
 		bytesRead += streamSize;
 
 		if (bytesRead > 188 * 256 * 256) {
-			std::cerr << "Signal: " << pBonDriver->GetSignalLevel() << "dB" << std::endl;
+			if (log) std::cerr << "Signal: " << pBonDriver->GetSignalLevel() << "dB" << std::endl;
 			bytesRead = 0;
 		}
 
