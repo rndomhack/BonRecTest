@@ -4,23 +4,27 @@
 #include "stdafx.h"
 #include "BonRecTest.h"
 
-CBonRecTest pBonRecTest;
+bool isSignal = false;
 
 unsigned int __stdcall WaitThread(void *pParam)
 {
 	getchar();
 
+	isSignal = true;
+
 	return 0;
+}
+
+BOOL WINAPI HandlerRoutine(DWORD dwCtrlType)
+{
+	isSignal = true;
+
+	return TRUE;
 }
 
 void usage()
 {
 	std::cerr << "Usage: BonRecTest.exe --driver BonDriver.dll --output output.ts [--space space] [--channel channel]" << std::endl;
-}
-
-BOOL WINAPI consoleCtrlHandler(DWORD types) {
-	pBonRecTest.Stop();
-	return TRUE;
 }
 
 int _tmain(int argc, TCHAR* argv[])
@@ -33,6 +37,7 @@ int _tmain(int argc, TCHAR* argv[])
 		return 0;
 	}
 
+	CBonRecTest pBonRecTest;
 	HANDLE hWaitThread;
 
 	TCHAR *pEnd;
@@ -86,9 +91,10 @@ int _tmain(int argc, TCHAR* argv[])
 
 	hWaitThread = (HANDLE)_beginthreadex(NULL, 0, WaitThread, NULL, 0, NULL);
 
-	SetConsoleCtrlHandler(*consoleCtrlHandler, true);
-	while (WaitForSingleObject(hWaitThread, 10UL) != WAIT_OBJECT_0);
+	SetConsoleCtrlHandler(*HandlerRoutine, true);
+	while (!isSignal) Sleep(100UL);
 
+	TerminateThread(hWaitThread, -1);
 	CloseHandle(hWaitThread);
 	hWaitThread = NULL;
 
