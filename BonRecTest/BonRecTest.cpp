@@ -11,9 +11,7 @@ CBonRecTest::CBonRecTest() :
 	log(false),
 	hBonDriver(NULL),
 	hDecoder(NULL),
-	pBonDriver(NULL),
 	pBonDriver2(NULL),
-	pDecoder(NULL),
 	pDecoder2(NULL),
 	hRecThread(NULL),
 	hOutput(INVALID_HANDLE_VALUE),
@@ -80,8 +78,8 @@ void CBonRecTest::LoadBonDriver()
 		throw TEXT("Could not load BonDriver");
 	}
 
-	IBonDriver* (*CreateBonDriver)();
-	CreateBonDriver = (IBonDriver* (*)())GetProcAddress(hBonDriver, "CreateBonDriver");
+	IBonDriver2* (*CreateBonDriver)();
+	CreateBonDriver = (IBonDriver2* (*)())GetProcAddress(hBonDriver, "CreateBonDriver");
 
 	if (!CreateBonDriver) {
 		FreeLibrary(hBonDriver);
@@ -90,25 +88,13 @@ void CBonRecTest::LoadBonDriver()
 		throw TEXT("Could not get address CreateBonDriver()");
 	}
 
-	pBonDriver = CreateBonDriver();
+	pBonDriver2 = CreateBonDriver();
 
-	if (!pBonDriver) {
+	if (!pBonDriver2) {
 		FreeLibrary(hBonDriver);
 		hBonDriver = NULL;
 
 		throw TEXT("Could not get IBonDriver");
-	}
-
-	pBonDriver2 = dynamic_cast<IBonDriver2 *>(pBonDriver);
-
-	if (!pBonDriver2) {
-		pBonDriver->Release();
-		pBonDriver = NULL;
-
-		FreeLibrary(hBonDriver);
-		hBonDriver = NULL;
-
-		throw TEXT("Could not open tuner");
 	}
 }
 
@@ -118,8 +104,7 @@ void CBonRecTest::UnloadBonDriver()
 
 	if (log) std::cerr << "Unload BonDriver..." << std::endl;
 
-	pBonDriver->Release();
-	pBonDriver = NULL;
+	pBonDriver2->Release();
 	pBonDriver2 = NULL;
 
 	FreeLibrary(hBonDriver);
@@ -142,8 +127,8 @@ void CBonRecTest::LoadDecoder()
 		throw TEXT("Could not load Decoder");
 	}
 
-	IB25Decoder* (*CreateB25Decoder)();
-	CreateB25Decoder = (IB25Decoder* (*)())GetProcAddress(hDecoder, "CreateB25Decoder");
+	IB25Decoder2* (*CreateB25Decoder)();
+	CreateB25Decoder = (IB25Decoder2* (*)())GetProcAddress(hDecoder, "CreateB25Decoder");
 
 	if (!CreateB25Decoder) {
 		FreeLibrary(hDecoder);
@@ -152,32 +137,20 @@ void CBonRecTest::LoadDecoder()
 		throw TEXT("Could not get address CreateB25Decoder()");
 	}
 
-	pDecoder = CreateB25Decoder();
+	pDecoder2 = CreateB25Decoder();
 
-	if (!pDecoder) {
+	if (!pDecoder2) {
 		FreeLibrary(hDecoder);
 		hDecoder = NULL;
 
 		throw TEXT("Could not get IB25Decoder");
 	}
 
-	if (!pDecoder->Initialize()) {
+	if (!pDecoder2->Initialize()) {
 		FreeLibrary(hDecoder);
 		hDecoder = NULL;
 
 		throw TEXT("Could not initialize IB25Decoder");
-	}
-
-	pDecoder2 = dynamic_cast<IB25Decoder2 *>(pDecoder);
-
-	if (!pDecoder2) {
-		pDecoder->Release();
-		pDecoder = NULL;
-
-		FreeLibrary(hDecoder);
-		hDecoder = NULL;
-
-		throw TEXT("Could not get IB25Decoder2");
 	}
 
 	pDecoder2->DiscardNullPacket(true);
@@ -191,8 +164,7 @@ void CBonRecTest::UnloadDecoder()
 
 	if (log) std::cerr << "Unload Decoder..." << std::endl;
 
-	pDecoder->Release();
-	pDecoder = NULL;
+	pDecoder2->Release();
 	pDecoder2 = NULL;
 
 	FreeLibrary(hDecoder);
@@ -240,12 +212,12 @@ void CBonRecTest::OpenTuner()
 {
 	if (log) std::cerr << "Open Tuner..." << std::endl;
 
-	if (!pBonDriver->OpenTuner()) {
+	if (!pBonDriver2->OpenTuner()) {
 		throw TEXT("Could not open tuner");
 	}
 
 	if (!pBonDriver2->SetChannel(space, channel)) {
-		pBonDriver->CloseTuner();
+		pBonDriver2->CloseTuner();
 
 		throw TEXT("Could not set channel");
 	}
@@ -257,7 +229,7 @@ void CBonRecTest::CloseTuner()
 
 	if (log) std::cerr << "Close Tuner..." << std::endl;
 
-	pBonDriver->CloseTuner();
+	pBonDriver2->CloseTuner();
 }
 
 void CBonRecTest::StartThread()
@@ -313,9 +285,9 @@ void CBonRecTest::RecMain()
 	DWORD bytesRead = 0UL;
 
 	while (isThreadWorking) {
-		if (pBonDriver->GetTsStream(&pStreamData, &streamSize, &streamRemain)) {
+		if (pBonDriver2->GetTsStream(&pStreamData, &streamSize, &streamRemain)) {
 			if (pStreamData && streamSize) {
-				if (hDecoder && pDecoder->Decode(pStreamData, streamSize, &pDecodeData, &decodeSize)) {
+				if (hDecoder && pDecoder2->Decode(pStreamData, streamSize, &pDecodeData, &decodeSize)) {
 					WriteFile(hOutput, pDecodeData, decodeSize, &bytesWritten, NULL);
 				}
 				else {
@@ -327,7 +299,7 @@ void CBonRecTest::RecMain()
 		bytesRead += streamSize;
 
 		if (bytesRead > 188 * 256 * 256) {
-			if (log) std::cerr << "Signal: " << pBonDriver->GetSignalLevel() << "dB" << std::endl;
+			if (log) std::cerr << "Signal: " << pBonDriver2->GetSignalLevel() << "dB" << std::endl;
 			bytesRead = 0;
 		}
 

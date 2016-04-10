@@ -33,9 +33,7 @@ private:
 
 	HMODULE hBonDriver;
 	HMODULE hDecoder;
-	IBonDriver *pBonDriver;
 	IBonDriver2 *pBonDriver2;
-	IB25Decoder *pDecoder;
 	IB25Decoder2 *pDecoder2;
 	HANDLE hRecThread;
 	HANDLE hOutput;
